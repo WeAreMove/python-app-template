@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: configuration-snippet
+  annotations:
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($http_referer ~* "^https://((?:.*\.(_CORS_DOMAINS_))|(?:localhost)|(?:127.0.0.1))\/?$")
+      {
+          set $cors "true";
+          set $f_origin "$http_referer";
+      }
+      if ($http_origin ~* "^https://((?:.*\.(_CORS_DOMAINS_))|(?:localhost)|(?:127.0.0.1))\/?$")
+      {
+          set $cors "true";
+          set $f_origin "$http_origin";
+      }
+      if ($request_method = 'OPTIONS')
+      {
+          set $cors "${cors}options";
+      }
+      
+      if ($cors = "true")
+      {
+          add_header 'Access-Control-Allow-Origin' "$f_origin" always;
+          add_header 'Access-Control-Allow-Methods' 'GET, PUT, POST, DELETE, PATCH, OPTIONS' always;
+          add_header 'Access-Control-Allow-Headers' '*' always;
+          add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+      }
+      
+      if ($cors = "trueoptions")
+      {
+          add_header 'Access-Control-Allow-Origin' "$f_origin";
+          add_header 'Access-Control-Allow-Methods' 'GET, PUT, POST, DELETE, PATCH, OPTIONS';
+          add_header 'Access-Control-Allow-Headers' '*';
+          add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+          add_header 'Access-Control-Max-Age' 1728000;
+          add_header 'Content-Type' 'text/plain charset=UTF-8';
+          add_header 'Content-Length' 0;
+          return 204;
+      }
+      
+      add_header Upgrade $http_upgrade;
+      add_header Connection "upgrade";

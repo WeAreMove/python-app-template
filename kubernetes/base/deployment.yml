@@ -1,0 +1,89 @@
+#            - name: PYTHONVERBOSE
+#              value: "true"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: _PROJECT_NAME_
+  labels:
+    app: _PROJECT_NAME_
+spec:
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: _PROJECT_NAME_
+  template:
+    metadata:
+      labels:
+        app: _PROJECT_NAME_
+    spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "2"
+      containers:
+        - name: _PROJECT_NAME_
+          command: [ "/app/entrypoint.sh" ]
+          # command: [ "/usr/bin/supervisord" ]
+          # args: [ "-c", "/etc/supervisord.conf" ]
+          image: _PROJECT_NAME_-image
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 0.2
+            limits:
+              memory: 1024Mi
+              cpu: 1
+          envFrom:
+            - secretRef:
+                name: _PROJECT_NAME_-creds
+          env:
+            - name: NEW_RELIC_CONFIG_FILE
+              value: "/etc/newrelic.ini"
+            - name: NEW_RELIC_APM_NAME
+              value: "_PROJECT_NAME_-stage"
+            - name: NEW_RELIC_APP_NAME
+              value: "_PROJECT_NAME_-stage"
+            - name: NEW_RELIC_METADATA_KUBERNETES_CLUSTER_NAME
+              value: stage
+            - name: NEW_RELIC_METADATA_KUBERNETES_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NEW_RELIC_METADATA_KUBERNETES_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NEW_RELIC_METADATA_KUBERNETES_NAMESPACE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NEW_RELIC_METADATA_KUBERNETES_DEPLOYMENT_NAME
+              value: _PROJECT_NAME_-stage
+            - name: NEW_RELIC_METADATA_KUBERNETES_CONTAINER_NAME
+              value: "_PROJECT_NAME_"
+            - name: NEW_RELIC_APPLICATION_LOGGING_ENABLED
+              value: "false"
+            - name: NEW_RELIC_APPLICATION_LOGGING_METRICS_ENABLED
+              value: "false"
+            - name: NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED
+              value: "false"
+            - name: NEW_RELIC_LOG
+              value: "/dev/null"
+            - name: NEW_RELIC_METADATA_KUBERNETES_CONTAINER_IMAGE_NAME
+              value: "557143635936.dkr.ecr.eu-central-1.amazonaws.com/app/_PROJECT_NAME_"
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: "/tmp/prometheus"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace

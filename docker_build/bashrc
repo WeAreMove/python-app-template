@@ -1,0 +1,20 @@
+
+export EDITOR='vim'
+
+if [[ -n "$BASH" ]] && [[ "$SHLVL" -le 2 ]] && [[ -t 0 && -t 1 ]] && [[ "$-" == *i* ]] && which zsh >& /dev/null; then
+    export DISABLE_AUTO_UPDATE=true
+    echo "This is _PROJECT_NAME_ K8S"
+    zsh
+    exit $?
+else
+    echo "This is _PROJECT_NAME_ K8S"
+    echo "for oh-my-zsh, type: zsh"
+fi
+
+alias l='ls -CF'
+alias la='ls -A'
+alias ll='ls -alF'
+alias ls='ls --color=auto'
+alias lsa='ls -lah'
+alias md='mkdir -p'
+alias awkuniq='awk -F":" "{ if (!map[\$1]++) { print \$1 } }"'

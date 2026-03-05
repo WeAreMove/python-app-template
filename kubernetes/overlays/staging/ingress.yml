@@ -1,0 +1,62 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: _PROJECT_NAME_
+  labels:
+    app: _PROJECT_NAME_
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    external-dns.alpha.kubernetes.io/hostname: "_PROJECT_NAME_._STAGE_DOMAIN_"
+    cert-manager.io/cluster-issuer: clusterissuer-letsencrypt-production
+    nginx.ingress.kubernetes.io/enable-global-auth: "false"
+    nginx.ingress.kubernetes.io/client-header-buffer-size: 10000k
+    nginx.ingress.kubernetes.io/large-client-header-buffers: 4 10000k
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    #nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.oauth2-proxy.svc.cluster.local./oauth2/auth"
+    #nginx.ingress.kubernetes.io/auth-signin: "https://auth._STAGE_DOMAIN_/oauth2/start?rd=$scheme://$host$request_uri"
+    nginx.ingress.kubernetes.io/whitelist-source-range: 10.0.0.0/16, 3.121.21.253/32, 13.245.120.236/32, 51.17.147.142/32, 3.122.1.7/32, 18.159.29.206/32, 3.124.82.125/32, 188.26.105.67/32, 212.143.71.42/32, 5.29.125.226/32, 5.29.125.225/32, 105.29.235.81/32
+spec:
+  rules:
+  - host: _PROJECT_NAME_._STAGE_DOMAIN_
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+                name: _PROJECT_NAME_
+                port:
+                  number: 80
+  tls:
+  - hosts:
+    - _PROJECT_NAME_._STAGE_DOMAIN_
+    secretName: _PROJECT_NAME_-tls-secret
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: _PROJECT_NAME_-internal
+  annotations:
+    kubernetes.io/ingress.class: nginx-internal
+    nginx.ingress.kubernetes.io/client-header-buffer-size: 10000k
+    nginx.ingress.kubernetes.io/large-client-header-buffers: 4 10000k
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+  - host: _PROJECT_NAME_.int._STAGE_DOMAIN_
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: _PROJECT_NAME_
+              port:
+                number: 80
+

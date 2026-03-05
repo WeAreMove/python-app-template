@@ -1,0 +1,106 @@
+name: _PROJECT_NAME_ - Deploy
+
+on:
+  # trigger build
+  workflow_dispatch:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    outputs:
+      image_tag: ${{ steps.set.outputs.image_tag }}
+      ref_name: ${{ steps.set.outputs.ref_name }}
+      full_image_tag: ${{ steps.set.outputs.ref_name }}-${{ steps.set.outputs.image_tag }} # use ref name (easy to see) and image_tag for unicity
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set IMAGE_TAG as env
+        id: set
+        run: |
+          FULL_BRANCH=${{ github.ref_name }}
+          REF_NAME="$(echo ${FULL_BRANCH//[\/_\.]/-} | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]._-')"
+          IMAGE_TAG=$(git rev-parse --short=7 ${{ github.sha }})
+          echo "ref_name=${REF_NAME}" >> $GITHUB_OUTPUT
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.REGION }}
+          mask-aws-account-id: 'no'
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: _PROJECT_NAME_ - build + push
+        id: docker_build__PROJECT_NAME_
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          context: .
+          tags: ${{ vars.ACCOUNTID }}.dkr.ecr.${{ vars.REGION }}.amazonaws.com/${{ vars.REPO }}:${{ steps.set.outputs.ref_name }},${{ vars.ACCOUNTID }}.dkr.ecr.${{ vars.REGION }}.amazonaws.com/${{ vars.REPO }}:${{ steps.set.outputs.image_tag }},${{ vars.ACCOUNTID }}.dkr.ecr.${{ vars.REGION }}.amazonaws.com/${{ vars.REPO }}:${{ steps.set.outputs.ref_name }}-${{ steps.set.outputs.image_tag }}
+          labels: _PROJECT_NAME_
+          platforms: linux/amd64
+          # offx linux/arm64
+
+
+  choose-target:
+    needs: build
+    outputs:
+      overlay: ${{ steps.choose.outputs.overlay }}
+      cluster: ${{ steps.choose.outputs.cluster }}
+      namespace: ${{ steps.choose.outputs.namespace }}
+      dynamic: ${{ steps.choose.outputs.dynamic }}
+      image_tag: ${{ needs.build.outputs.full_image_tag }}
+    runs-on: ubuntu-22.04
+    env:
+      BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: choose
+        id: choose  
+        run: |
+          if [[ "$BRANCH" == "release" ]]; then
+            echo "overlay=release" >> $GITHUB_OUTPUT
+            echo "cluster=prod" >> $GITHUB_OUTPUT
+            echo "namespace=_PROJECT_NAME_" >> $GITHUB_OUTPUT
+            echo "dynamic=false" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == "master" || "$BRANCH" == "main" ]]; then
+            echo "overlay=staging" >> $GITHUB_OUTPUT
+            echo "cluster=stage" >> $GITHUB_OUTPUT
+            echo "namespace=_PROJECT_NAME_-stage" >> $GITHUB_OUTPUT
+            echo "dynamic=false" >> $GITHUB_OUTPUT
+          else
+            echo "overlay=dev" >> $GITHUB_OUTPUT
+            echo "cluster=stage" >> $GITHUB_OUTPUT
+            echo "namespace=_PROJECT_NAME_" >> $GITHUB_OUTPUT
+            echo "dynamic=true" >> $GITHUB_OUTPUT
+          fi
+    
+  run-deploy:
+    needs: choose-target
+    uses: ./.github/workflows/run-deploy.yaml
+    with:
+      namespace: ${{ needs.choose-target.outputs.namespace }}
+      dynamic-namespace: ${{ needs.choose-target.outputs.dynamic == 'true' }}
+      environment-overlay: ${{ needs.choose-target.outputs.overlay }}
+      cluster-name: ${{ vars.OWNER_NAME }}-${{ needs.choose-target.outputs.cluster }}-${{ vars.REGION }}
+      cluster-authentication-role-arn: arn:aws:iam::${{ vars.ACCOUNTID }}:role/${{ vars.OWNER_NAME }}-kubernetes-deployer-${{ needs.choose-target.outputs.cluster }}
+      deployment-name: ${{ vars.DEPLOYMENT }}
+      region: ${{ vars.REGION }}
+      accountId: ${{ vars.ACCOUNTID }}
+      repo: ${{ vars.REPO }}
+      image_tag: ${{ needs.choose-target.outputs.image_tag }}
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SLACK_WEBHOOK_CHANNEL: ${{ secrets.SLACK_WEBHOOK_CHANNEL }}

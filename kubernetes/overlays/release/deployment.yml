@@ -1,0 +1,35 @@
+#             - name: PYTHONVERBOSE
+#               value: "false"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: _PROJECT_NAME_
+spec:
+  template:
+    spec:
+      containers:
+        - name: _PROJECT_NAME_
+          env: 
+            - name: NEW_RELIC_APM_NAME
+              value: "_PROJECT_NAME_-prod"
+            - name: NEW_RELIC_APP_NAME
+              value: "_PROJECT_NAME_-prod"
+            - name: NEW_RELIC_METADATA_KUBERNETES_CLUSTER_NAME
+              value: prod
+            - name: NEW_RELIC_METADATA_KUBERNETES_DEPLOYMENT_NAME
+              value: _PROJECT_NAME_
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: _PROJECT_NAME_-creds
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: _PROJECT_NAME_-creds
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: NEW_RELIC_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: _PROJECT_NAME_-creds
+                  key: NEW_RELIC_LICENSE_KEY

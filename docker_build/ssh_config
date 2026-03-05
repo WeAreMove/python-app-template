@@ -1,0 +1,4 @@
+Host github.com
+    User git
+    StrictHostKeyChecking no
+    IdentityFile /root/.ssh/ed25519_key

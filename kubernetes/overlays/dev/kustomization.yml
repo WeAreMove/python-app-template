@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+patches:
+  - path: ../../base/ingress-configuration-snippet-stage.yaml
+    target:
+      group: networking.k8s.io
+      kind: Ingress
+      labelSelector: "app=_PROJECT_NAME_"
+      version: v1
+    
+
+resources:
+- ../../base
+- ingress.yml
+

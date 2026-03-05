@@ -1,0 +1,52 @@
+[core]
+	pager = cat
+[color]
+        ui = true
+[alias]
+        parent = "!git show-branch | grep '*' | grep -v \"$(git rev-parse --abbrev-ref HEAD)\" | head -n1 | sed 's/.*\\[\\(.*\\)\\].*/\\1/' | sed 's/[\\^~].*//' #"
+        sb = "!f() { if [[ -n \"$1\" ]]; then git checkout \"$1\" && git pull; else echo \"Specify branch\"; fi;}; f"
+        rb = "!f() { if [[ -n \"$1\" ]]; then PREV=\"$(git branch --show-current)\"; git checkout \"$1\" && git pull --rebase \"${2:-origin}\" \"$1\"; git checkout \"$PREV\"; git rebase \"$1\"; else echo \"Specify branch to rebase from [and origin]\"; fi;}; f"
+        # rb = "!f() { if [[ -n \"$1\" ]]; then git pull --rebase origin \"$1\"; else echo \"Specify branch\"; fi;}; f"
+	lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
+        ls = log --color --graph --pretty=format:'%Cred%h%Creset [%ad] -%C(yellow)%d%Creset %s %Cgreen(%cr)%C(bold blue) <%an>%Creset' --abbrev-commit --date=short
+        ll = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --numstat
+        lnc = log --pretty=format:"%h\\ %s\\ [%cn]"
+        lds = log --pretty=format:"%C(yellow)%h\\ %ad%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --date=short
+        ld = log --pretty=format:"%C(yellow)%h\\ %ad%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --date=relative
+        le = log --oneline --decorate
+        fl = log -u
+        dl = "!git ll -1"
+        dlc = diff --cached HEAD^
+        f = "!git ls-files | grep -i"
+        la = "!git config -l | grep alias | cut -c 7-"
+        done = "!f() { git branch | grep "$1" | cut -c 3- | grep -v done | xargs -I{} git branch -m {} done-{}; }; f"
+        last = log -1 HEAD
+
+        ours = "!f() { git co --ours $@ && git add $@; }; f"
+        theirs = "!f() { git co --theirs $@ && git add $@; }; f"
+
+        cp = cherry-pick
+        st = status -s
+        cl = clone
+        ci = commit
+        cam = commit -am
+        co = checkout
+        br = branch
+        diff = diff --word-diff
+        dc = diff --cached
+
+        r = reset
+        r1 = reset HEAD^
+        r2 = reset HEAD^^
+        rh = reset --hard
+        rh1 = reset HEAD^ --hard
+        rh2 = reset HEAD^^ --hard
+
+        #unstage = reset HEAD -- .
+        #cleanall = clean -fdx
+        # empty branch
+        ebranch2 = "!f(){ git checkout --orphan ${1} && git reset HEAD -- . && git clean -fdx &&  echo 'README' >> README.md && git add . && git commit -am 'git init'; }; f"
+        ebranch = "!f(){ git checkout --orphan ${1} && git rm -rf . && git commit --allow-empty -m 'base commit (empty)'; }; f"
+        eblame = "!f(){ git blame ${1} | sed -r -e 's/[0-9]+-[0-9]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+ \\+[0-9]+//g' -e 's/\\(/ - /' -e 's/\\)/: /' | less; }; f"
+
+        logtree = log --graph --oneline --decorate --all

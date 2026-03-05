@@ -1,0 +1,219 @@
+name: Run Deploy
+
+on:
+  workflow_call:
+    inputs:
+      namespace:
+        required: true
+        type: string
+      dynamic-namespace:
+        required: false
+        type: boolean
+        default: false
+      environment-overlay:
+        required: true
+        type: string
+      cluster-name:
+        required: true
+        type: string
+      cluster-authentication-role-arn:
+        required: true
+        type: string
+      deployment-name:
+        required: true
+        type: string
+      region:
+        required: true
+        type: string
+      accountId:
+        required: true
+        type: string
+      repo:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      SLACK_WEBHOOK_CHANNEL:
+        required: false
+      SLACK_WEBHOOK_URL:
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Deploy start
+        id: deploy_start
+        run: |
+          echo "started=$(date -u +%FT%TZ)" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+
+      - name: Set namespace
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if ${{ inputs.dynamic-namespace }}; then
+            NAMESPACE=$(echo "${{ inputs.namespace }}-${BRANCH//[\/_\.]/-}" | tr "[:upper:]" "[:lower:]" | tr -cd "[:alnum:]._-")
+          else
+            NAMESPACE="${{ inputs.namespace }}"
+          fi
+
+          echo "namespace=$NAMESPACE" >> $GITHUB_ENV
+          echo "Branch ${BRANCH}, deploying to Namespace: ${NAMESPACE}"
+
+      - name: Build image url
+        run: |
+          IMAGE="${{ inputs.accountId }}.dkr.ecr.${{ inputs.region }}.amazonaws.com/${{ inputs.repo }}:${{ inputs.image_tag }}"
+          echo "built_image=$IMAGE" >> $GITHUB_ENV
+          echo "Will use image: $IMAGE"
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.region }}
+
+      - name: Setup binaries (aws-cli/kustomize/iam-authenticator)
+        uses: ./.github/actions/setup-aws-kustomize
+        with:
+          cluster-authentication-role-arn: ${{ inputs.cluster-authentication-role-arn }}
+          cluster-name: ${{ inputs.cluster-name }}
+          region: ${{ inputs.region }}
+
+      - name: Check Namespace
+        run: |
+          kubectl create namespace "${{ env.namespace }}" || echo "Namespace exists"
+
+      - name: Deploy image
+        uses: ./.github/actions/deploy
+        with:
+          namespace: ${{ env.namespace }}
+          deployment-name: ${{ inputs.deployment-name }}
+          environment-overlay: ${{ inputs.environment-overlay }}
+          image: ${{ env.built_image }}
+          region: ${{ inputs.region }}
+
+      - name: Deployment Status
+        shell: bash
+        run: |
+          set -x
+          CUTOFF="${{ steps.deploy_start.outputs.started }}"
+          URL="$(
+            kubectl get ingress -n "${{ env.namespace }}" -o json 2>/dev/null |
+            jq -r '
+              def urls(kind):
+              .spec.rules[]
+              | .host as $host
+              | .http.paths[]
+              | "- \(kind)://\($host)\(.path)";
+              {
+              public: [
+                  .items[]
+                  | select(.metadata.annotations["kubernetes.io/ingress.class"] == "nginx")
+                  | urls("https")
+              ],
+              internal: [
+                  .items[]
+                  | select(.metadata.annotations["kubernetes.io/ingress.class"] == "nginx-internal")
+                  | urls("http")
+              ]
+              }
+              | "Public:"
+              , (.public[]? )
+              , ""
+              , "Internal (via wireguard):"
+              , (.internal[]? )
+            '
+            )"
+          KEVENTS="$(
+            kubectl get events \
+            --sort-by='.metadata.creationTimestamp' \
+            -n "${{ env.namespace }}" -o json 2>/dev/null |
+            jq -r --arg cutoff "$CUTOFF" '
+              .items
+              | sort_by(.firstTimestamp)
+              | .[]
+              | select(.firstTimestamp > $cutoff and .type == "Warning")
+              | .firstTimestamp + " > " + .message | tostring'
+          )"
+
+          {
+            echo "URL<<EOF"
+            echo "$URL"
+            echo "EOF"
+          } >> $GITHUB_ENV
+          {
+            echo "KEVENTS<<EOF"
+            echo "${KEVENTS}"
+            echo "EOF"
+          } >> $GITHUB_ENV
+
+          {
+            echo ""
+            echo "# Deployment Summary"
+            echo ""
+            echo "Namespace: \`${{ env.namespace }}\`"
+            echo "### Ingresses"
+            echo "${URL}"
+            echo ""
+            echo "### Recent Warnings (if any)"
+            echo "${KEVENTS}"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Is Slack Enabled ?
+        if: ${{ always() }}
+        run: |
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ] && \
+          [ -n "${{ secrets.SLACK_WEBHOOK_CHANNEL }}" ]; then
+            echo "SLACK_ENABLED=true" >> $GITHUB_ENV
+          else
+            echo "SLACK_ENABLED=false" >> $GITHUB_ENV
+          fi
+
+      - uses: act10ns/slack@v2
+        if: ${{ env.SLACK_ENABLED == 'true' }}
+        with:
+          status: ${{ job.status }}
+          channel: ${{secrets.SLACK_WEBHOOK_CHANNEL}}
+          message: |
+            ${{ github.repository }}: ${{ github.head_ref || github.ref_name }} deployed to ${{ inputs.cluster-name }}, namespace: ${{ env.namespace }}.
+            
+            URLs available:
+            
+            ${{ env.URL }}
+            
+            This might take some minutes to be ready, so wait a bit.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send Slack error info
+        if: ${{ failure() && env.SLACK_ENABLED == 'true' }}
+        uses: act10ns/slack@v2
+        with:
+          status: ${{ job.status }}
+          message: |
+            Deployment to ${{ inputs.cluster-name }} , namespace: ${{ env.namespace }} , run ID: ${{ github.run_id }} failed.
+
+            Possible reasons (if related to k8s cluster):
+            ```
+            ${{ env.KEVENTS }}
+            ```
+            More details here: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Please handle this.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

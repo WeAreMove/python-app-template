@@ -1,0 +1,50 @@
+name: deploy
+description: Deploy docker image by image-tag to kubernetes
+inputs:
+  namespace:
+    description: Kubernetes namespace to deploy
+    required: true
+  deployment-name:
+    description: The name of this deployment
+    required: true
+  region:
+    description: Name of AWS region
+    default: eu-central-1
+    required: false
+  environment-overlay:
+    description: Overlay folder to pick from for Kustomize apply
+    default: staging
+    required: false
+  image:
+    description: Image to deploy
+    required: true
+runs:
+  using: "composite"
+  steps:
+  - name: Deploy
+    shell: bash
+    run: |
+      set -x
+      exec 2>&1
+      DEPLOYMENT="${{ inputs.deployment-name }}"
+      NAMESPACE=${{ inputs.namespace }}
+
+      cd kubernetes/overlays/${{ inputs.environment-overlay }}
+      kustomize edit set image _PROJECT_NAME_-image=${{ inputs.image }}
+      sed -i "s%{{ DEV_NS }}%${NAMESPACE}%g" *.yml
+      kustomize build --load-restrictor=LoadRestrictionsNone . > k8sapply.yml
+      echo "::group::YAML rendered"
+      cat k8sapply.yml
+      echo "::endgroup::"
+      kubectl apply -f k8sapply.yml -n $NAMESPACE
+      if ! kubectl -n $NAMESPACE rollout status deployment/$DEPLOYMENT -w --timeout=600s ; then
+        echo "$DEPLOYMENT rollout check failed:"
+        echo "$DEPLOYMENT deployment:"
+        kubectl -n $NAMESPACE describe deployment $DEPLOYMENT
+        echo "$DEPLOYMENT replicaset:"
+        kubectl -n $NAMESPACE describe rs -l app=$DEPLOYMENT
+        echo "$DEPLOYMENT pods:"
+        kubectl -n $NAMESPACE describe pod -l app=$DEPLOYMENT
+        exit 1
+      fi
+      echo "$(date +%F\ %T) Deploy step end"

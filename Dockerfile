@@ -63,7 +63,7 @@ RUN pip install --upgrade pip && \
     pip install gunicorn && \
     cd /app && pip install -r requirements.txt && chmod +x entrypoint.sh
 
-RUN cd frontend && npm install && npm run build
+# RUN cd frontend && npm install && npm run build
 
 RUN mv supervisord.conf /etc/supervisord.conf
 EXPOSE 8000

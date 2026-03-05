@@ -161,15 +161,15 @@ Project name (should match `_PROJECT_NAME_`)
 
 `OWNER_NAME`
 
-Used in cluster settings during deploy
+Used in cluster settings during deploy; has to be `move-infra`
 
 `REGION`
 
-AWS region (e.g. `eu-west-1`)
+AWS region (e.g. `eu-central-1`)
 
 `REPO`
 
-ECR repository name
+ECR repository name `_PROJECT_NAME_`
 
 ----------
 
@@ -219,6 +219,13 @@ Add:
 -   Enable **Read access**
 -   Used for `git pull` during deployment
 
+Eg:
+
+```
+cat ~/.ssh/travelyo-supplyplatform-k8s-pull.key.pub
+```
+
+
 ----------
 
 # AWS Secrets Manager Configuration
@@ -226,8 +233,8 @@ Add:
 Secrets must exist under:
 
 ```awk
-kubernetes/prod/_PROJECT_NAME_
-kubernetes/stage/_PROJECT_NAME_
+move-infra/kubernetes/prod/_PROJECT_NAME_
+move-infra/kubernetes/stage/_PROJECT_NAME_
 
 ```
 
@@ -243,7 +250,7 @@ Description
 
 `APP_ENV`
 
-`prod` or `stage`
+`production` or `dev`
 
 `AWS_ACCESS_KEY_ID`
 
@@ -267,7 +274,7 @@ New Relic API key
 
 `GH_SSH_KEY`
 
-Base64 encoded public GitHub deploy key
+Base64 encoded private GitHub deploy key
 
 ----------
 
@@ -275,7 +282,7 @@ Base64 encoded public GitHub deploy key
 
 Must be:
 
--   Public key
+-   Private key
 -   Base64 encoded
 -   Single line
 -   No line breaks
@@ -285,7 +292,8 @@ Generate:
 bash
 
 ```bash
-cat id_rsa.pub | base64 | tr -d '\n'
+ssh-keygen -t ed25519 -f ~/.ssh/travelyo-supplyplatform-k8s-pull.key
+cat ~/.ssh/travelyo-supplyplatform-k8s-pull.key | base64 | tr -d '\n'
 ```
 
 ----------

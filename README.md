@@ -107,18 +107,38 @@ Go to your repository on GitHub: **Settings → Secrets and variables → Action
 
 ### Deploy Keys
 
-**Settings → Deploy Keys**
+The cluster uses an SSH key to `git pull` your repository during deployment. You need to generate a key pair, add the public half to GitHub, and store the private half in AWS (covered in Step 4).
 
-Add the **public key** corresponding to your `GH_SSH_KEY` (see Step 3 below) and enable **Read access**. This key is used by the cluster to `git pull` during deployment.
-
+**1. Generate the key pair** (run this once on your machine):
 ```bash
-# Print the public key to copy into GitHub
-cat ~/.ssh/travelyo-supplyplatform-k8s-pull.key.pub
+ssh-keygen -t ed25519 -f ~/.ssh/my-app-k8s-pull.key
 ```
+This creates two files:
+- `~/.ssh/my-app-k8s-pull.key` — private key (goes to AWS Secrets Manager)
+- `~/.ssh/my-app-k8s-pull.key.pub` — public key (goes to GitHub)
+
+**2. Copy the public key:**
+```bash
+cat ~/.ssh/my-app-k8s-pull.key.pub
+```
+
+**3. Add it to GitHub:** go to **Settings → Deploy Keys → Add deploy key**, paste the public key, enable **Allow read access**, and save.
 
 ---
 
-## Step 3 — Configure AWS Secrets Manager
+## Step 3 — Create the ECR Repository
+
+The pipeline pushes Docker images to Amazon ECR. The repository must exist before the first deployment.
+
+1. Go to **AWS Console → ECR → Repositories → Create repository**
+2. Set the name to match your `REPO` GitHub variable exactly (e.g. `app/my-app`)
+3. Keep it **Private** and create it
+
+> If your team manages infrastructure via Terraform or a shared infra repo, check there first — the repository may need to be provisioned that way instead.
+
+---
+
+## Step 4 — Configure AWS Secrets Manager
 
 The Kubernetes cluster reads your app's runtime secrets from AWS Secrets Manager. You must create secrets for each environment **before** running your first deployment.
 
@@ -141,24 +161,19 @@ Each secret must contain the following keys:
 | `NEW_RELIC_API_KEY` | New Relic API key |
 | `GH_SSH_KEY` | Base64-encoded private SSH deploy key (see below) |
 
-### Generating the SSH Deploy Key (`GH_SSH_KEY`)
+### `GH_SSH_KEY` — the private deploy key
+
+This is the private key you generated in the Deploy Keys step above. Run this to get the value to paste into Secrets Manager:
 
 ```bash
-# Generate the key pair
-ssh-keygen -t ed25519 -f ~/.ssh/travelyo-supplyplatform-k8s-pull.key
-
-# Print the base64-encoded private key — paste this as the GH_SSH_KEY secret value
-cat ~/.ssh/travelyo-supplyplatform-k8s-pull.key | base64 | tr -d '\n'
+cat ~/.ssh/my-app-k8s-pull.key | base64 | tr -d '\n'
 ```
 
-The value must be:
-- The **private** key
-- Base64 encoded
-- A **single line** with no line breaks
+The value must be a single line with no line breaks.
 
 ---
 
-## Step 4 — Deploy
+## Step 5 — Deploy
 
 Once everything above is configured, deployment is **fully automatic on every push**.
 

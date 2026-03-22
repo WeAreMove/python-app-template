@@ -162,9 +162,22 @@ echo "Using: $REPLACER"
 
 echo "Replacing placeholders..."
 
-find . -type f -not \( -path "./.git/*" -o -iname 'prepare.sh' \) -print0 |
-while IFS= read -r -d '' file; do
-  replace_in_file "$file"
+# Only scan deployment-related files — placeholders never appear in application code
+DEPLOY_PATHS=(
+  ".github"
+  "kubernetes"
+  "Dockerfile"
+  "entrypoint.sh"
+  "supervisord.conf"
+  "README.md"
+)
+
+for path in "${DEPLOY_PATHS[@]}"; do
+  [ -e "$path" ] || continue
+  find "$path" -type f -print0 |
+  while IFS= read -r -d '' file; do
+    replace_in_file "$file"
+  done
 done
 
 echo "Done ✅"

@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: moverunner
     outputs:
       image_tag: ${{ steps.set.outputs.image_tag }}
       ref_name: ${{ steps.set.outputs.ref_name }}
@@ -61,7 +61,7 @@ jobs:
       namespace: ${{ steps.choose.outputs.namespace }}
       dynamic: ${{ steps.choose.outputs.dynamic }}
       image_tag: ${{ needs.build.outputs.full_image_tag }}
-    runs-on: ubuntu-22.04
+    runs-on: moverunner
     env:
       BRANCH: ${{ github.ref_name }}
     steps:

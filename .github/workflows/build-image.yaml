@@ -16,7 +16,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: moverunner
     steps:
       - uses: actions/checkout@v3
       - name: Set IMAGE_TAG as env

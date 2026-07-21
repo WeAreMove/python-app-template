@@ -3,6 +3,12 @@ kind: Ingress
 metadata:
   name: configuration-snippet
   annotations:
+    nginx.ingress.kubernetes.io/client-body-buffer-size: 1M
+    nginx.ingress.kubernetes.io/proxy-body-size: 4M
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: 512k
+    nginx.ingress.kubernetes.io/proxy-buffers: "4 512k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "512k"
     nginx.ingress.kubernetes.io/configuration-snippet: |
       if ($http_referer ~* "^https://((?:.*\.(_CORS_DOMAINS_))|(?:localhost)|(?:127.0.0.1))\/?$")
       {

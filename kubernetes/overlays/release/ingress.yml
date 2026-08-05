@@ -14,9 +14,27 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    #nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.oauth2-proxy.svc.cluster.local./oauth2/auth"
-    #nginx.ingress.kubernetes.io/auth-signin: "https://auth._STAGE_DOMAIN_/oauth2/start?rd=$scheme://$host$request_uri"
-    nginx.ingress.kubernetes.io/whitelist-source-range: 10.0.0.0/16, 3.121.21.253/32, 13.245.120.236/32, 51.17.147.142/32, 3.122.1.7/32, 18.159.29.206/32, 3.124.82.125/32, 188.26.105.67/32, 212.143.71.42/32, 5.29.125.226/32, 5.29.125.225/32, 105.29.235.81/32
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.oauth2-proxy.svc.cluster.local./oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.prodwearemove.com/oauth2/start?rd=$scheme://$host$request_uri"
+    nginx.ingress.kubernetes.io/server-snippet: |
+      satisfy any;
+      allow 10.0.0.0/16;          # the subnet itself
+      allow 3.121.21.253/32;      # ops vpn
+      allow 13.245.120.236/32;    # ops vpn
+      allow 51.17.147.142/32;     # ops vpn
+      allow 3.122.1.7/32;         # legacy ops vpn (travelyo-cdn.site)
+      allow 18.159.29.206/32;     # ops k8s gw
+      allow 3.124.82.125/32;      # stage k8s gw
+      allow 212.143.71.42/32;     # home Yoni
+      allow 5.29.125.226/32;      # IL office
+      allow 5.29.125.225/32;      # IL office
+      allow 105.29.235.81/32;     # SA office ?
+      allow 3.125.162.158/32;     # nat gw
+      allow 3.73.106.47/32;       # prod k8s gw
+      allow 188.26.105.67/32;     # alecs Yassi
+      allow 90.84.238.126/32;     # alecs Yassi
+      allow 144.24.199.204/32;    # alecs Marseille
+      deny all;
 spec:
   rules:
   - host: _PROJECT_NAME_._PROD_DOMAIN_

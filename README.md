@@ -9,7 +9,7 @@ A bootstrap template for deploying Python applications to our Kubernetes cluster
 The deployment flow works like this:
 
 ```
-1. Clone template → 2. Run prepare.sh → 3. Configure GitHub → 4. Configure AWS → 5. Push code → 6. Auto-deploys to K8s
+1. Clone template → 2. Run prepare.sh → 3. Run bootstrap.sh (AWS + GitHub) → 4. Fill shared secrets → 5. Push code → 6. Auto-deploys to K8s
 ```
 
 Each push to GitHub triggers a GitHub Actions pipeline that:
@@ -26,6 +26,7 @@ Before you begin, make sure you have:
 - `bash` (required)
 - `gsed` / `perl` — for placeholder replacement (see [Install Dependencies](#install-dependencies))
 - `whiptail` — optional, provides a nicer interactive setup UI
+- `aws` CLI, `jq` and `gh` (logged in) — for `bootstrap.sh`
 - Access to the AWS account and ECR repository
 - GitHub repository admin access (to configure secrets/variables)
 
@@ -75,6 +76,35 @@ The script collects, validates, and replaces these four values everywhere:
 CORS domains are normalized automatically into `domain1.com|domain2.com` format.
 
 > **Important:** Commit your repo before running the script. `.git/` and `prepare.sh` itself are excluded from replacements.
+
+---
+
+## Step 1b — Provision AWS + GitHub automatically (`bootstrap.sh`)
+
+After `prepare.sh`, run `bootstrap.sh` once from the repo root. It automates Steps 2–4 below:
+
+| Creates | Name |
+|---|---|
+| ECR repository | `app/_PROJECT_NAME_` |
+| S3 buckets (private, encrypted, versioned) — skip with `--no-s3` | `move-k8s-_PROJECT_NAME_-stage`, `move-k8s-_PROJECT_NAME_-prod` |
+| Deploy key — public half added to the GitHub repo (read-only) | `_PROJECT_NAME_-k8s-pull` |
+| Secrets Manager secrets (`APP_ENV`, `GH_SSH_KEY`, `S3_BUCKET`, + the shared keys below) | `move-infra/kubernetes/{stage,prod}/_PROJECT_NAME_` |
+| GitHub repository variables | `ACCOUNTID`, `DEPLOYMENT`, `OWNER_NAME`, `REGION`, `REPO` |
+
+```bash
+./bootstrap.sh --dry-run   # show what would be created, change nothing
+./bootstrap.sh
+```
+
+It is idempotent: existing resources are kept and secret keys that already have a value are
+never overwritten, so re-running only fills in what is missing. Shared secret values are taken
+from these env vars if exported, otherwise created empty and listed at the end for you to fill in:
+`APP_AWS_ACCESS_KEY_ID`, `APP_AWS_SECRET_ACCESS_KEY`, `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_ACCOUNT`, `NEW_RELIC_API_KEY`.
+
+Not handled (the script reminds you): IAM permissions for the app's runtime key on the S3 buckets,
+and the CI repository secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, Slack).
+
+The manual steps below remain as reference.
 
 ---
 
@@ -203,6 +233,7 @@ You can also trigger a deployment manually from **Actions → _PROJECT_NAME_ - D
 ```
 .
 ├── prepare.sh              # Bootstrap script — run once to initialize the project
+├── bootstrap.sh            # Provisions ECR, S3, deploy key, secrets, GitHub variables
 ├── Dockerfile              # Python 3.12 Alpine image with Supervisor, New Relic, ZSH
 ├── entrypoint.sh           # Container entrypoint
 ├── supervisord.conf        # Supervisor process config

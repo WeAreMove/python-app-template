@@ -55,12 +55,16 @@ replace_in_file() {
       ;;
 
     perl)
-      perl -0777 -pi -e "
-        s/_PROJECT_NAME_/\Q$PROJECT_NAME\E/g;
-        s/_PROD_DOMAIN_/\Q$PROD_DOMAIN\E/g;
-        s/_STAGE_DOMAIN_/\Q$STAGE_DOMAIN\E/g;
-        s/_CORS_DOMAINS_/\Q$CORS_DOMAINS\E/g;
-      " "$file"
+      # Values are passed via env and used as literal replacements
+      # (\Q..\E would quotemeta them, leaking backslashes into the output).
+      PROJECT_NAME="$PROJECT_NAME" PROD_DOMAIN="$PROD_DOMAIN" \
+      STAGE_DOMAIN="$STAGE_DOMAIN" CORS_DOMAINS="$CORS_DOMAINS" \
+      perl -0777 -pi -e '
+        s/_PROJECT_NAME_/$ENV{PROJECT_NAME}/g;
+        s/_PROD_DOMAIN_/$ENV{PROD_DOMAIN}/g;
+        s/_STAGE_DOMAIN_/$ENV{STAGE_DOMAIN}/g;
+        s/_CORS_DOMAINS_/$ENV{CORS_DOMAINS}/g;
+      ' "$file"
       ;;
   esac
 }
